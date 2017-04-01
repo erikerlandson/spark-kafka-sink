@@ -16,7 +16,7 @@ resolvers ++= Seq(
 libraryDependencies ++= Seq(
   "org.slf4j" % "slf4j-nop" % "1.7.16" % Provided,
   "org.json4s" %% "json4s-jackson" % "3.2.11" % Provided,
-  "org.apache.kafka" % "kafka-clients" % "0.10.2.0" % Provided,
+  "org.apache.kafka" % "kafka-clients" % "0.10.2.0",
   "org.apache.kafka" % "kafka_2.11" % "0.10.2.0" % Provided,
   "io.dropwizard.metrics" % "metrics-core" % "3.1.2" % Provided,
   "org.apache.spark" %% "spark-core" % SPARK_VERSION % Provided,
