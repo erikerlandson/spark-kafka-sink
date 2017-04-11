@@ -23,7 +23,7 @@ class KafkaSink(val properties: Properties, val registry: MetricRegistry,
   val broker = popt("broker").get
   val topic = popt("topic").get
 
-  lazy val reporter = new KafkaReporter(registry, broker, topic)
+  lazy val reporter = new KafkaReporter(registry, broker, topic, properties)
 
   def start(): Unit = {
     logger.info(s"Starting Kafka metric reporter at $broker, topic $topic")
