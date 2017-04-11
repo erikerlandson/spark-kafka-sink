@@ -45,7 +45,7 @@ class KafkaReporter(
     } {
       val kv = entry.getValue().asInstanceOf[String].split('=')
       if (kv.length != 2) {
-        logger.warn(s"Ignoring bad prodconf_* setting: ${entry.getValue()}")
+        logger.error(s"Ignoring bad prodconf_* setting: ${entry.getValue()}")
       } else {
         props.put(kv(0), kv(1))
       }
@@ -111,6 +111,9 @@ class KafkaReporter(
       for { entry <- counters.entrySet().asScala } {
         counterJSON(entry.getValue()).foreach { jv => prod.send(metricRec(entry.getKey(), jv)) }
       }
+      for { entry <- histograms.entrySet().asScala } {
+        histJSON(entry.getValue()).foreach { jv => prod.send(metricRec(entry.getKey(), jv)) }
+      }
     }
   }
 
@@ -125,7 +128,7 @@ class KafkaReporter(
       case v: Float => Some(compact(render(tpe ~ ("value" -> v))))
       case v: Double => Some(compact(render(tpe ~ ("value" -> v))))
       case v => {
-        logger.warn(s"Ignoring unexpected Gauge value: $v")
+        logger.error(s"Ignoring unexpected Gauge value: $v")
         None
       }
     }
@@ -134,5 +137,33 @@ class KafkaReporter(
   private def counterJSON(counter: Counter): Option[String] = {
     val tpe = ("type" -> "counter")
     Some(compact(render(tpe ~ ("value" -> counter.getCount()))))
+  }
+
+  private def histJSON(hist: Histogram): Option[String] = {
+    val snapshot = hist.getSnapshot()
+    Try {
+      val hqs = Option(properties.getProperty("histquantiles")).getOrElse(
+        "0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0")
+      val q = hqs.split(",").map(_.toDouble).toVector
+      val x = q.map { z => snapshot.getValue(z) }
+      (q, x)
+    } match {
+      case Failure(_) => {
+        val hqs = properties.getProperty("histquantiles")
+        logger.error(s"Bad histquantiles setting: $hqs\nIgnoring histogram metric output")
+        None
+      }
+      case Success((q, x)) => {
+        val hsub =
+          ("q" -> q) ~
+          ("x" -> x) ~
+          ("min" -> snapshot.getMin()) ~
+          ("max" -> snapshot.getMax()) ~
+          ("mean" -> snapshot.getMean()) ~
+          ("stdv" -> snapshot.getStdDev()) ~
+          ("n" -> hist.getCount())
+        Some(compact(render(("type" -> "histogram") ~ ("value" -> hsub))))
+      }
+    }
   }
 }
