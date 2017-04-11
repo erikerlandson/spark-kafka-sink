@@ -14,17 +14,19 @@ import com.manyangled.kafkasink.KafkaReporter
 class KafkaSink(val properties: Properties, val registry: MetricRegistry,
     securityMgr: SecurityManager) extends org.apache.spark.metrics.sink.Sink {
 
+  val logger: Logger = LoggerFactory.getLogger(this.getClass)
+
   private def popt(prop: String): Option[String] =
     Option(properties.getProperty(prop))
 
-  lazy val reporter = new KafkaReporter(
-    registry,
-    popt("broker").get,
-    popt("topic").get)
+  // These are non-negotiable
+  val broker = popt("broker").get
+  val topic = popt("topic").get
+
+  lazy val reporter = new KafkaReporter(registry, broker, topic)
 
   def start(): Unit = {
-    println(s"STARTING KAFKA SINK")
-    println(s"KafkaSink properties:\n$properties")
+    logger.info(s"Starting Kafka metric reporter at $broker, topic $topic")
     val period = popt("period").getOrElse("10").toLong
     val tstr = popt("unit").getOrElse("seconds").toUpperCase(Locale.ROOT)
     val tunit = TimeUnit.valueOf(tstr)
@@ -32,12 +34,12 @@ class KafkaSink(val properties: Properties, val registry: MetricRegistry,
   }
 
   def stop(): Unit = {
-    println(s"STOPPING KAFKA SINK")
+    logger.info(s"Stopping Kafka metric reporter at $broker, topic $topic")
     reporter.stop()
   }
 
   def report(): Unit = {
-    println(s"REPORTING THROUGH KAFKA SINK")
+    logger.info(s"Reporting metrics to Kafka reporter at $broker, topic $topic")
     reporter.report()
   }
 }

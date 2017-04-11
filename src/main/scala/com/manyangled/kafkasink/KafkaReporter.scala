@@ -38,7 +38,7 @@ class KafkaReporter(
     super.start(period, unit)
     val status = for {
       kp <- Try {
-        logger.warn(s"Opening kafka endpoint $kafkaEndpoint")
+        logger.info(s"Opening Kafka endpoint $kafkaEndpoint")
         val props = new Properties()
         props.put("bootstrap.servers", kafkaEndpoint)
         props.put("client.id", "KafkaReporter")
@@ -55,11 +55,11 @@ class KafkaReporter(
     } yield { kp }
     status match {
       case Success(kp) => {
-        logger.warn(s"Kafka producer connected to $kafkaEndpoint")
+        logger.info(s"Kafka producer connected to $kafkaEndpoint")
         producer = Some(kp)
       }
       case Failure(err) => {
-        logger.error(s"Failure opening kafka endpoint $kafkaEndpoint:\n$err")
+        logger.error(s"Failure opening Kafka endpoint $kafkaEndpoint:\n$err")
       }
     }
   }
@@ -72,32 +72,28 @@ class KafkaReporter(
     timers: java.util.SortedMap[String, Timer]): Unit = {
 
     if (producer.isEmpty) {
-      logger.error(s"Failed endpoint at $kafkaEndpoint: metric output ignored") 
+      logger.error(s"Missing broker at $kafkaEndpoint: metric output ignored") 
     } else {
       // dump metric output to the kafka topic
       val prod = producer.get
       for { entry <- gauges.entrySet().asScala } {
-        val (key, value) = (entry.getKey(), entry.getValue().getValue())
-        println(s"REPORT: $key => $value")
-        val json = gaugeJSON(entry)
-        if (!json.isEmpty) {
-          val rec = new ProducerRecord[String, String](kafkaTopic, key, json.get)
-          prod.send(rec)
-        }
+        gaugeJSON(entry.getValue()).foreach { jv => prod.send(metricRec(entry.getKey(), jv)) }
       }
     }
   }
 
-  private def gaugeJSON(entry: Entry[String, Gauge[_]]): Option[String] = {
-    val (key, rawval) = (entry.getKey(), entry.getValue().getValue())
+  private def metricRec(key: String, value: String) =
+    new ProducerRecord[String, String](kafkaTopic, key, value)
+
+  private def gaugeJSON(gauge: Gauge[_]): Option[String] = {
     val tpe = ("type" -> "gauge")
-    rawval match {
+    gauge.getValue() match {
       case v: Int => Some(compact(render(tpe ~ ("value" -> v))))
       case v: Long => Some(compact(render(tpe ~ ("value" -> v))))
       case v: Float => Some(compact(render(tpe ~ ("value" -> v))))
       case v: Double => Some(compact(render(tpe ~ ("value" -> v))))
       case v => {
-        logger.warn(s"Unexpected value type from Gauge value: $v")
+        logger.warn(s"Ignoring unexpected Gauge value: $v")
         None
       }
     }
