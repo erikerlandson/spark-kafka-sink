@@ -16,6 +16,7 @@ import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 
 import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods._
+import org.json4s.JsonAST.JObject
 
 import com.codahale.metrics._
 
@@ -114,6 +115,12 @@ class KafkaReporter(
       for { entry <- histograms.entrySet().asScala } {
         histJSON(entry.getValue()).foreach { jv => prod.send(metricRec(entry.getKey(), jv)) }
       }
+      for { entry <- meters.entrySet().asScala } {
+        meterJSON(entry.getValue()).foreach { jv => prod.send(metricRec(entry.getKey(), jv)) }
+      }
+      for { entry <- timers.entrySet().asScala } {
+        timerJSON(entry.getValue()).foreach { jv => prod.send(metricRec(entry.getKey(), jv)) }
+      }
     }
   }
 
@@ -140,17 +147,45 @@ class KafkaReporter(
   }
 
   private def histJSON(hist: Histogram): Option[String] = {
+    for {
+      hsub <- samplingAST(hist, "histquantiles")
+      nsub <- Some(("n" -> hist.getCount()))
+    } yield {
+      compact(render(("type" -> "histogram") ~ ("value" -> (nsub ~ hsub))))
+    }
+  }
+
+  private def meterJSON(meter: Meter): Option[String] = {
+    for {
+      msub <- meteredAST(meter)
+      nsub <- Some(("n" -> meter.getCount()))
+    } yield {
+      compact(render(("type" -> "meter") ~ ("value" -> (nsub ~ msub))))
+    }
+  }
+
+  private def timerJSON(timer: Timer): Option[String] = {
+    for {
+      hsub <- samplingAST(timer, "timerquantiles")
+      msub <- meteredAST(timer)
+      nsub <- Some(("n" -> timer.getCount()))
+    } yield {
+      compact(render(("type" -> "timer") ~ ("value" -> (nsub ~ hsub ~ msub))))
+    }
+  }
+
+  private def samplingAST(hist: Sampling, qsetting: String): Option[JObject] = {
     val snapshot = hist.getSnapshot()
     Try {
-      val hqs = Option(properties.getProperty("histquantiles")).getOrElse(
+      val hqs = Option(properties.getProperty(qsetting)).getOrElse(
         "0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0")
       val q = hqs.split(",").map(_.toDouble).toVector
       val x = q.map { z => snapshot.getValue(z) }
       (q, x)
     } match {
       case Failure(_) => {
-        val hqs = properties.getProperty("histquantiles")
-        logger.error(s"Bad histquantiles setting: $hqs\nIgnoring histogram metric output")
+        val hqs = properties.getProperty(qsetting)
+        logger.error(s"Bad quantile setting: $hqs\nIgnoring histogram metric output")
         None
       }
       case Success((q, x)) => {
@@ -160,10 +195,18 @@ class KafkaReporter(
           ("min" -> snapshot.getMin()) ~
           ("max" -> snapshot.getMax()) ~
           ("mean" -> snapshot.getMean()) ~
-          ("stdv" -> snapshot.getStdDev()) ~
-          ("n" -> hist.getCount())
-        Some(compact(render(("type" -> "histogram") ~ ("value" -> hsub))))
+          ("stdv" -> snapshot.getStdDev())
+        Some(hsub)
       }
     }
+  }
+
+  private def meteredAST(meter: Metered): Option[JObject] = {
+    val msub =
+      ("rate1" -> meter.getOneMinuteRate()) ~
+      ("rate5" -> meter.getFiveMinuteRate()) ~
+      ("rate15" -> meter.getFifteenMinuteRate()) ~
+      ("rateMean" -> meter.getMeanRate())
+    Some(msub)
   }
 }
