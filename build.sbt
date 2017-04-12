@@ -28,3 +28,11 @@ licenses += ("Apache-2.0", url("http://opensource.org/licenses/Apache-2.0"))
 scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature")
 
 scalacOptions in (Compile, doc) ++= Seq("-doc-root-content", baseDirectory.value+"/root-doc.txt")
+
+test in assembly := {}
+
+assemblyShadeRules in assembly := Seq(
+  ShadeRule.zap("scala.**").inAll,
+  ShadeRule.zap("org.slf4j.**").inAll,
+  ShadeRule.zap("org.apache.kafka.clients.consumer.**").inAll
+)
