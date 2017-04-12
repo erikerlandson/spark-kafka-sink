@@ -30,10 +30,8 @@ A Kafka metric sink for Apache Spark
 ```
 
 #### Configure your spark metrics.properties file
+Edit /path/to/spark/conf/metrics.properites to look like this:
 ```
-% cd /path/to/spark
-# edit metrics.properites to look like this:
-% cat /conf/metrics.properties
 master.source.jvm.class=org.apache.spark.metrics.source.JvmSource
 worker.source.jvm.class=org.apache.spark.metrics.source.JvmSource
 driver.source.jvm.class=org.apache.spark.metrics.source.JvmSource
@@ -44,9 +42,14 @@ executor.source.jvm.class=org.apache.spark.metrics.source.JvmSource
 *.sink.kafka.topic=test
 *.sink.kafka.period=10
 *.sink.kafka.unit=seconds
-#*.sink.kafka.histquantiles=0.1,0.2
+
+# histquantiles and timerquantiles have following defaults:
+#*.sink.kafka.histquantiles=0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0
+#*.sink.kafka.timerquantiles=0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0
+
 # These carry configure settings to the KafkaProducer
-# *.sink.kafka.prodconf_xxx, where xxx can be anything, just has to be unique
+# *.sink.kafka.prodconf_xxx, where xxx can be anything, just has to
+# be unique per setting:
 *.sink.kafka.prodconf_a=retries=0
 *.sink.kafka.prodconf_b=acks=all
 *.sink.kafka.prodconf_c=request.timeout.ms=5
