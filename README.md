@@ -57,10 +57,20 @@ executor.source.jvm.class=org.apache.spark.metrics.source.JvmSource
 ```
 
 #### Run a spark-shell with kafka metric sink plugin
+
+Make sure the kafka-sink jar file is on spark's classpath.  This simple test adds the jar
+using the `--jars` argument:
 ```bash
 % cd /path/to/spark
 % ./bin/spark-shell --master=local[*] --jars=/path/to/spark-kafka-sink/target/scala-2.11/spark-kafka-sink-assembly-0.1.0.jar
-# If you run a Kafka consumer listening on topic "test" at 127.0.0.1:9092, you should
-# start to see metrics appearing.  The metric names are the kafka message key.  Values are
-# JSON, representing metric structures
 ```
+If you run a Kafka consumer listening on topic `test` at `127.0.0.1:9092`, you should
+start to see metrics appearing.  The metric names are the kafka message key. Values are
+JSON, representing metric structures.  If you have [apache kafka](https://github.com/apache/kafka)
+installed, you can test a simple consumer on the command line:
+```bash
+% kafka-console-consumer.sh --bootstrap-server 127.0.0.1:9092 --topic test --from-beginning
+```
+(This CLI consumer does not print out the message keys, so you will only see the values)
+
+
