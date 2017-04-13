@@ -30,7 +30,7 @@ A Kafka metric sink for Apache Spark
 ```
 
 #### Configure your spark metrics.properties file
-Edit /path/to/spark/conf/metrics.properites to look like this:
+Edit `/path/to/spark/conf/metrics.properites` to look like this:
 ```
 master.source.jvm.class=org.apache.spark.metrics.source.JvmSource
 worker.source.jvm.class=org.apache.spark.metrics.source.JvmSource
